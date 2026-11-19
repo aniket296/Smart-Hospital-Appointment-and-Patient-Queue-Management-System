@@ -114,12 +114,7 @@ CREATE TABLE appointments (
     created_by_user_id INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    active_slot_key VARCHAR(64) GENERATED ALWAYS AS (
-        CASE
-            WHEN status = 'CANCELLED' THEN NULL
-            ELSE (doctor_id::text || '|' || appointment_date::text || '|' || slot_time::text)
-        END
-    ) STORED,
+    
     CONSTRAINT uq_appointments_active_slot_key UNIQUE (active_slot_key),
     CONSTRAINT uq_appointments_doctor_date_token UNIQUE (doctor_id, appointment_date, token_number),
     CONSTRAINT fk_appointments_patient FOREIGN KEY (patient_id)
@@ -129,6 +124,9 @@ CREATE TABLE appointments (
     CONSTRAINT fk_appointments_created_by FOREIGN KEY (created_by_user_id)
         REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
+CREATE UNIQUE INDEX uq_appointments_active_slot
+ON appointments (doctor_id, appointment_date, slot_start_time)
+WHERE status <> 'CANCELLED';
 CREATE INDEX idx_appointments_doctor_date_slot ON appointments (doctor_id, appointment_date, slot_time);
 CREATE INDEX idx_appointments_patient_date ON appointments (patient_id, appointment_date);
 CREATE INDEX idx_appointments_date_status ON appointments (appointment_date, status);
