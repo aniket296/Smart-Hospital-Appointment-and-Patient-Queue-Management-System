@@ -1,85 +1,56 @@
-# Pull Request: Phase 1 (MVP) & Phase 2 (Enhancements & Docs) to Main
+# Pull Request: Phase 3 — Render Deployment Support (Render PostgreSQL + Flask Web Service + React Static Site)
 
-## 1. Executive Summary
-This PR merges the full-stack, production-ready implementation of **Project 25: Smart Hospital Appointment and Patient Queue Management System (Simple Variant)** into `main`. The system completely fulfills all functional requirements (FR), non-functional requirements (NFR), and strict technical stack specifications without any AI/ML dependencies.
-
----
-
-## 2. Changes Summary by Phase
-
-### Phase 1: MVP Core
-- **Foundation (1A)**:
-  - MySQL 8.0+ InnoDB database schema (`backend/database/schema.sql`) defining all 9 tables with foreign keys and the `STORED` generated column `active_slot_key` + unique index (`uq_appointments_active_slot_key`).
-  - `seed.sql` with real Werkzeug `scrypt` password hashes (`backend/scripts/generate_seed_hashes.py`) and `CURDATE()`-relative dynamic dates.
-  - Flask application factory (`backend/app/__init__.py`), `Config` classes, timezone utilities (`HOSPITAL_TIMEZONE=Asia/Kolkata`), unified error handlers, and `/api/health` endpoint.
-- **Authentication & Master Data (1B)**:
-  - 8-hour JWT bearer tokens, `@auth_required` and `@roles_required` decorators.
-  - Self-registration strictly enforcing `PATIENT` role and creating linked `patients` record.
-  - Department, Doctor, and Schedule configuration with schedule overlap detection on identical weekdays (`409 SCHEDULE_OVERLAP`).
-  - Deterministic slot generation calculating effective capacity $\min(\text{total\_slots}, \text{max\_patients})$.
-- **Booking & Queue Core (1C)**:
-  - Online booking (`BOOKED`) and walk-in booking (`CONFIRMED`, auto-assigning next free slot if omitted).
-  - Atomic sequential daily token allocation `<DOC_CODE>-<3-digit-seq>`.
-  - Duplicate active slot prevention (`409 SLOT_ALREADY_BOOKED`) and daily capacity limits (`409 DAILY_CAPACITY_REACHED`).
-  - Status state machine with single `IN_CONSULTATION` guard per doctor, `NO_SHOW` date restrictions, and `appointment_status_history` logging.
-  - Public daily queue endpoint (`/api/queue`).
-- **Frontend Foundation & Patient Console (1D)**:
-  - Vite React setup, Axios client with JWT interceptor and 401 handling, ProtectedRoute guards.
-  - `LoginPage`, `RegisterPage`, and `PatientDashboard` with slot grid and token confirmation.
-- **Staff Screens (1E)**:
-  - `DoctorDashboard` for calling next token and marking completion.
-  - `AdminDashboard` for walk-in booking, status updates, doctor profiles, and schedule management.
-  - `QueueBoard` with live polling every 6 seconds.
-
-### Phase 2: Enhancements & Documentation
-- **Rescheduling, Cancellation & Concurrency (2A)**:
-  - `PATCH /api/appointments/<id>/reschedule`: Retains token if doctor/date unchanged; issues new token and stores prior token in `previous_token` if doctor/date changes.
-  - `POST /api/appointments/<id>/cancel`: Frees slot for rebooking (`active_slot_key` becomes `NULL`); cancelled tokens are never reused.
-  - Multi-threaded concurrency test verifying that when multiple threads book the same slot, exactly 1 succeeds (201) and the rest receive 409 Conflict.
-- **Notifications (2B)**:
-  - `NotificationService` supporting SMTP with a strict 10s timeout, graceful fallback to `SIMULATED`, and permanently simulated SMS alerts.
-  - `GET /api/notifications` paginated endpoint and `NotificationsPage` UI.
-- **Daily Reports & CSV Export (2C)**:
-  - `GET /api/reports/daily` returning status, doctor, online vs. walk-in, and hourly distributions.
-  - `GET /api/reports/daily/export` generating streaming CSV downloads.
-  - `ReportsPage` UI with Chart.js Doughnut, Bar, and Line charts.
-- **Full Accuracy Pass & Documentation (2D)**:
-  - Consolidated end-to-end integration test (`test_appointments_and_queue.py`).
-  - Comprehensive documentation: `SRS.md`, `ER_AND_UML_DIAGRAMS.md`, `ARCHITECTURE.md`, `TEST_PLAN_AND_CASES.md`, `USER_MANUAL.md`, `DEPLOYMENT_NOTES.md`, and `README.md`.
+**Source Branch:** `phase-3-render-postgres` -> **Target Branch:** `main`
 
 ---
 
-## 3. Test Results & Build Verification
+## 1. Summary
+Adds full cloud deployment support on **Render** backed by **Render PostgreSQL** (`hospital_queue_db` / `smart-hospital-db`), a Gunicorn **Flask Web Service** (`smart-hospital-api`), and a **React Static Site** (`smart-hospital-web`) with SPA routing rewrites, while maintaining 100% compatibility with existing local MySQL 8.0+ and SQLite test environments.
 
-- **Backend Pytest Suite**:
-  - `21 passed in 11.65s` (0 failures, 0 errors, 0 warnings)
-  - Suites: `test_foundation.py`, `test_auth_and_master.py`, `test_booking_and_queue_core.py`, `test_reschedule_cancel_concurrency.py`, `test_notifications.py`, `test_reports.py`, `test_appointments_and_queue.py`.
-- **Frontend Vitest Suite**:
-  - `7 passed (7)` across 2 test files (`auth_and_patient.test.jsx`, `staff_and_queue.test.jsx`).
-- **Frontend Production Build**:
-  - `vite build` completed successfully (`105 modules transformed`, output in `frontend/dist/`).
+---
+
+## 2. Changes by Sub-Phase
+
+### Sub-Phase 3A: Backend & PostgreSQL Readiness
+- **[backend/requirements.txt](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/requirements.txt)**: Added `psycopg2-binary>=2.9.10` and `gunicorn>=23.0.0`.
+- **[backend/app/config.py](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/app/config.py)** & **[backend/app/__init__.py](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/app/__init__.py)**:
+  - Added `normalize_database_url()` to convert Render's `postgres://` and `postgresql://` connection strings to `postgresql+psycopg2://`.
+  - Added `parse_cors_origins()` reading `CORS_ORIGINS` from environment variables.
+  - Exposed module-level `app = create_app()` in `backend/app/__init__.py` with automatic repo-root path resolution so `gunicorn app:app --bind 0.0.0.0:$PORT` runs seamlessly with `rootDir: backend`.
+- **[backend/database/postgres_schema.sql](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/database/postgres_schema.sql)** & **[backend/database/postgres_seed.sql](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/database/postgres_seed.sql)**:
+  - Full PostgreSQL 14+ DDL for all 9 tables with `SERIAL PRIMARY KEY`, `CHECK` constraints, `STORED` generated column `active_slot_key`, unique constraints, indexes, and idempotent `ON CONFLICT` seed data with sequence synchronization (`setval(pg_get_serial_sequence(...))`).
+- **[backend/tests/test_render_postgres_readiness.py](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/tests/test_render_postgres_readiness.py)**: Unit and integration tests covering URL normalization, `CORS_ORIGINS`, PostgreSQL schema/seed validation, requirements, and `/api/health`.
+
+### Sub-Phase 3B: Frontend Production Config & Render Blueprint
+- **[frontend/src/api/client.js](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/frontend/src/api/client.js)** & **[frontend/.env.example](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/frontend/.env.example)**:
+  - Added `resolveApiBaseUrl()` reading `import.meta.env.VITE_API_URL` (with `VITE_API_BASE_URL` and local `/api` fallbacks).
+- **[frontend/public/_redirects](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/frontend/public/_redirects)**:
+  - Added `/* /index.html 200` for SPA client-side routing on static hosts.
+- **[render.yaml](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/render.yaml)**:
+  - Render Blueprint provisioning `smart-hospital-db` (PostgreSQL), `smart-hospital-api` (Flask Web Service), and `smart-hospital-web` (React Static Site with `/* -> /index.html` rewrite).
+
+### Sub-Phase 3C: Deployment Docs, Tests & PR
+- **[docs/DEPLOYMENT_NOTES.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/DEPLOYMENT_NOTES.md)** & **[README.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/README.md)**:
+  - Added step-by-step instructions for Render Blueprint deployment, manual Render PostgreSQL + Web Service + Static Site setup, `psql` schema/seed execution, environment variables, SPA rewrite rules, and post-deploy verification.
+
+---
+
+## 3. Test & Build Verification Results
+
+- **Backend Pytest Suite (`pytest -v`)**: `26 passed` (0 failures, 0 warnings)
+- **Frontend Vitest Suite (`npm --prefix frontend test`)**: `8 passed` across 2 test files
+- **Frontend Production Build (`npm --prefix frontend run build`)**: `✓ built` (`105 modules transformed`, `frontend/dist/` output verified)
 
 ---
 
 ## 4. How to Verify
-1. Run backend tests:
+1. Run backend test suite:
    ```bash
-   pytest
+   .\.venv\Scripts\pytest.exe -v
    ```
-2. Run frontend tests:
+2. Run frontend test suite and production build:
    ```bash
    npm --prefix frontend test
-   ```
-3. Run frontend build:
-   ```bash
    npm --prefix frontend run build
    ```
-4. Start backend server:
-   ```bash
-   python backend/run.py
-   ```
-5. Start frontend dev server:
-   ```bash
-   cd frontend && npm run dev
-   ```
-6. Log in as `admin@hospital.test` (`Admin@123`), `doctor1@hospital.test` (`Doctor@123`), or `patient1@hospital.test` (`Patient@123`).
+3. Deploy on Render using `render.yaml` Blueprint or follow Section 1 of `docs/DEPLOYMENT_NOTES.md`.
