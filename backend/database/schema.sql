@@ -131,8 +131,9 @@ CREATE TABLE appointments (
     KEY idx_appointments_date_status (appointment_date, status),
     CONSTRAINT fk_appointments_patient FOREIGN KEY (patient_id)
         REFERENCES patients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    -- No ON UPDATE CASCADE here: MySQL forbids it on a column used by a STORED generated column
     CONSTRAINT fk_appointments_doctor FOREIGN KEY (doctor_id)
-        REFERENCES doctors (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+        REFERENCES doctors (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_appointments_created_by FOREIGN KEY (created_by_user_id)
         REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

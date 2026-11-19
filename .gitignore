@@ -44,7 +44,9 @@ yarn-debug.log*
 yarn-error.log*
 .vite/
 
-# IDE & OS
+# QA audit outputs
+qa_audit_results/
+
 .vscode/
 .idea/
 *.swp
