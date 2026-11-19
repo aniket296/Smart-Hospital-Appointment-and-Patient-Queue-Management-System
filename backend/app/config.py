@@ -7,18 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def normalize_database_url(raw_url: str | None) -> str | None:
-    """Normalize Render/Heroku postgres:// or postgresql:// URLs for SQLAlchemy + psycopg2."""
-    if not raw_url:
-        return None
-    url = raw_url.strip()
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg2://", 1)
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
-    return url
-
-
 def parse_cors_origins(raw_origins: str | None) -> str | list[str]:
     """Parse comma-separated CORS_ORIGINS env var or return '*' if wildcard/empty."""
     if not raw_origins or not raw_origins.strip() or raw_origins.strip() == "*":
@@ -46,7 +34,7 @@ def build_mysql_uri(db_name_env: str, default_db_name: str) -> str:
 
 
 class Config:
-    """Base configuration."""
+    """Base configuration for local development."""
 
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-key-change-in-production")
@@ -54,8 +42,9 @@ class Config:
     HOSPITAL_TIMEZONE = os.getenv("HOSPITAL_TIMEZONE", "Asia/Kolkata")
     CORS_ORIGINS = parse_cors_origins(os.getenv("CORS_ORIGINS", "*"))
 
-    SQLALCHEMY_DATABASE_URI = normalize_database_url(os.getenv("DATABASE_URL")) or build_mysql_uri(
-        "DB_NAME", "hospital_queue_db"
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "DATABASE_URL",
+        build_mysql_uri("DB_NAME", "hospital_queue_db"),
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -63,7 +52,7 @@ class Config:
         "pool_recycle": 280,
     }
 
-    # SMTP Configuration
+    # SMTP Configuration (optional; defaults gracefully to SIMULATED mode if unset)
     SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
@@ -83,13 +72,14 @@ class TestingConfig(Config):
     """Testing configuration using separate test database."""
 
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = normalize_database_url(
-        os.getenv("TEST_DATABASE_URL")
-    ) or build_mysql_uri("TEST_DB_NAME", "hospital_queue_test_db")
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "TEST_DATABASE_URL",
+        build_mysql_uri("TEST_DB_NAME", "hospital_queue_test_db"),
+    )
 
 
 class ProductionConfig(Config):
-    """Production configuration."""
+    """Production configuration for self-hosted deployments."""
 
     DEBUG = False
 

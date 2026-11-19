@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import api, { resolveApiBaseUrl } from '../api/client';
+import api from '../api/client';
 import { AuthProvider } from '../context/AuthContext';
 import QueueBoard from '../pages/QueueBoard';
 import NotificationsPage from '../pages/NotificationsPage';
@@ -114,18 +114,5 @@ describe('Staff Screens & Queue Board Vitest Tests', () => {
     expect(await screen.findByText('Appointment Booked')).toBeInTheDocument();
     expect(screen.getByText('patient@hospital.test')).toBeInTheDocument();
     expect(screen.getByText('SIMULATED')).toBeInTheDocument();
-  });
-
-  it('resolves VITE_API_URL with safe local fallback and /api normalization', () => {
-    expect(resolveApiBaseUrl({})).toBe('/api');
-    expect(resolveApiBaseUrl({ VITE_API_URL: 'https://smart-hospital-api.onrender.com/api' })).toBe(
-      'https://smart-hospital-api.onrender.com/api'
-    );
-    expect(resolveApiBaseUrl({ VITE_API_URL: 'https://smart-hospital-api.onrender.com/' })).toBe(
-      'https://smart-hospital-api.onrender.com/api'
-    );
-    expect(resolveApiBaseUrl({ VITE_API_BASE_URL: 'http://127.0.0.1:5000/api' })).toBe(
-      'http://127.0.0.1:5000/api'
-    );
   });
 });

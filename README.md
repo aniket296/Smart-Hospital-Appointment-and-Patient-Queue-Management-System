@@ -1,8 +1,6 @@
-# Project 25: Smart Hospital Appointment and Patient Queue Management System
+# Smart Hospital Appointment and Patient Queue Management System
 
-A full-stack, modular web application for hospital outpatient appointment booking, walk-in registration, sequential token generation, real-time deterministic queue tracking, email/SMS notification logging, and daily analytics with CSV exports.
-
-**No AI/ML:** All slot computations, token allocations, queue orderings, and reporting metrics are 100% deterministic, clean, and reliable.
+A full-stack, modular web application for hospital outpatient appointment booking, queue management, and doctor consultations.
 
 ---
 
@@ -11,127 +9,88 @@ A full-stack, modular web application for hospital outpatient appointment bookin
 ### Prerequisites
 - Python 3.11+
 - Node.js 20+
-- MySQL Server 8.0+ (or PostgreSQL 14+ via `DATABASE_URL`)
+- MySQL Server 8.0+
 
 ### Database Initialization
-**For Local MySQL 8.0+:**
 ```bash
 mysql -u root -p < backend/database/schema.sql
 mysql -u root -p < backend/database/seed.sql
-```
-
-**For PostgreSQL 14+ / Render PostgreSQL:**
-```bash
-psql "<DATABASE_URL>" -f backend/database/postgres_schema.sql
-psql "<DATABASE_URL>" -f backend/database/postgres_seed.sql
 ```
 
 ### Backend Setup & Server Start
 ```bash
 # Set up virtual environment
 python -m venv .venv
-.\.venv\Scripts\activate   # Linux/macOS: source .venv/bin/activate
+.\.venv\Scripts\activate   # Windows (or: source .venv/bin/activate on Linux/macOS)
 
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run pytest test suite
-pytest
+# Configure environment
+copy .env.example .env    # Windows (or: cp .env.example .env on Linux/macOS)
 
-# Start Flask backend API (http://127.0.0.1:5000)
-python backend/run.py
+# Start backend server
+python backend/run.py      # http://127.0.0.1:5000
 ```
 
-### Frontend Setup & Development Server
+### Frontend Setup & Dev Server Start
 ```bash
 cd frontend
 npm install
-npm test
-npm run build
 npm run dev                # http://127.0.0.1:5173
 ```
 
 ---
 
-## 2. Cloud Deployment on Render (PostgreSQL + Web Service + Static Site)
-
-This repository is pre-configured for **Render** deployment via [render.yaml](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/render.yaml):
-
-1. **Render PostgreSQL (`smart-hospital-db`)**:
-   - Database `hospital_queue_db` initialized with [backend/database/postgres_schema.sql](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/database/postgres_schema.sql) and [backend/database/postgres_seed.sql](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/backend/database/postgres_seed.sql).
-2. **Flask Backend Web Service (`smart-hospital-api`)**:
-   - Root directory: `backend`
-   - Build command: `pip install -r requirements.txt`
-   - Start command: `gunicorn app:app --bind 0.0.0.0:$PORT`
-   - Health check endpoint: `GET /api/health`
-   - Automatically normalizes Render's `DATABASE_URL` (`postgres://` / `postgresql://` -> `postgresql+psycopg2://`), reads `CORS_ORIGINS`, and falls back to `SIMULATED` email delivery when SMTP variables are unset.
-3. **React Static Site (`smart-hospital-web`)**:
-   - Root directory: `frontend`
-   - Build command: `npm install && npm run build`
-   - Publish directory: `dist`
-   - Environment variable: `VITE_API_URL=https://<backend-service>.onrender.com/api`
-   - Client-side SPA routing rewrite: `/*` -> `/index.html` (also in [frontend/public/_redirects](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/frontend/public/_redirects)).
-
-See [docs/DEPLOYMENT_NOTES.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/DEPLOYMENT_NOTES.md) for the complete step-by-step Render deployment guide.
-
----
-
-## 3. Seed Credentials
+## 2. Seed Credentials
 
 | Role | Email | Password | Access Scope |
 | :--- | :--- | :--- | :--- |
-| **Administrator / Receptionist** | `admin@hospital.test` | `Admin@123` | Master data, walk-in booking, queue oversight, reports |
-| **Doctor 1 (Cardiology)** | `doctor1@hospital.test` | `Doctor@123` | Doctor console, own queue, call/complete patient |
-| **Doctor 2 (General Medicine)** | `doctor2@hospital.test` | `Doctor@123` | Doctor console, own queue, call/complete patient |
-| **Doctor 3 (Orthopedics)** | `doctor3@hospital.test` | `Doctor@123` | Doctor console, own queue, call/complete patient |
-| **Patient 1** | `patient1@hospital.test` | `Patient@123` | Patient dashboard, slot booking, own appointments |
-| **Patient 2** | `patient2@hospital.test` | `Patient@123` | Patient dashboard, slot booking, own appointments |
-| **Patient 3** | `patient3@hospital.test` | `Patient@123` | Patient dashboard, slot booking, own appointments |
+| **Admin** | `admin@hospital.test` | `Admin@123` | Master data (doctors, departments, slots), daily reports, CSV export, notifications log |
+| **Doctor** | `doctor1@hospital.test` | `Doctor@123` | Doctor console, patient calling, consultation status transitions (`IN_CONSULTATION`, `COMPLETED`, `NO_SHOW`) |
+| **Doctor** | `doctor2@hospital.test` | `Doctor@123` | Doctor console (Pediatrics) |
+| **Staff / Receptionist** | `staff@hospital.test` | `Staff@123` | Walk-in patient registration, immediate token generation, live queue board |
+| **Patient** | `patient1@hospital.test` | `Patient@123` | Appointment booking, rescheduling, cancellation, token viewing |
 
 ---
 
-## 4. Architecture & Key Features
+## 3. Architecture & Key Features
 
 - **Database Concurrency & Integrity**:
   - `STORED` generated column `active_slot_key` on `appointments` prevents double booking of active slots at the database engine level, while allowing cancelled slots to be freely rebooked.
-  - Safe sequential daily token counter per doctor (`DOC1-001`, `DOC1-002`) updated atomically inside the booking transaction (`ON DUPLICATE KEY UPDATE` on MySQL, `ON CONFLICT (doctor_id, token_date) DO UPDATE` on PostgreSQL/SQLite). Cancelled tokens are never reused.
+  - Safe sequential daily token counter per doctor (`DOC1-001`, `DOC1-002`) updated atomically inside the booking transaction (`ON DUPLICATE KEY UPDATE`). Cancelled tokens are never reused.
 - **Strict Status Lifecycle**:
   - `BOOKED -> CONFIRMED -> IN_CONSULTATION -> COMPLETED`
   - Cancellation allowed from `BOOKED` or `CONFIRMED`.
-  - `NO_SHOW` permitted only on or after the scheduled appointment date.
-  - At most one patient per doctor can be `IN_CONSULTATION` at any given time.
-- **Resilient Notifications**:
-  - `NotificationService` attempts SMTP delivery with a 10s connection timeout and gracefully falls back to simulated logging on network or credential absence.
-  - SMS notifications are permanently simulated and logged for patient audit.
-- **Reporting & Visual Analytics**:
-  - Daily summary metrics with Chart.js doughnut, bar, and line visualizations.
-  - One-click CSV export of daily visits.
+  - Terminal statuses: `COMPLETED`, `CANCELLED`, `NO_SHOW`.
+- **Role-Based Access Control (RBAC)**:
+  - Secure JWT authentication with strict role checks on every API endpoint.
+- **Live Queue Monitoring**:
+  - Real-time auto-refresh queue board displaying current token calling and waiting list.
+- **Email & Notification Engine**:
+  - Automated transactional email confirmations with safe `SIMULATED` fallback when external SMTP credentials are not configured.
 
 ---
 
-## 5. Suggested Commit Milestones
+## 4. Suggested Commit Milestones
 
 ### Phase 1 (MVP — Weeks 1 to 6)
 - **Week 1 (1A)**: Repository layout, `.gitignore`, `.env.example`, MySQL `schema.sql` (with `active_slot_key`), `seed.sql` with Werkzeug hashes, Flask factory, and health endpoint.
-- **Week 2-3 (1B)**: JWT authentication, RBAC decorators, department/doctor endpoints, and slot generation.
-- **Week 4 (1C)**: Online and walk-in appointment booking, token counters, 409 duplicate slot rejection, and queue endpoint.
-- **Week 5 (1D)**: Vite setup, Axios client with Bearer tokens, route guards, Login/Register pages, and Patient Dashboard.
-- **Week 6 (1E)**: Doctor Console, Admin/Receptionist Console, Live Queue Board polling, and Phase 1 test suite.
+- **Week 2 (1B)**: Master data APIs (doctors, departments, slots) and JWT auth endpoints (`/api/auth/register`, `/api/auth/login`, `/api/auth/me`).
+- **Week 3 (1C)**: Atomic booking engine with daily token generation and double-booking guard.
+- **Week 4 (1D)**: Doctor consultation console and public live queue board APIs.
+- **Week 5 (1E)**: Frontend MVP UI (Vite, React Router, TailwindCSS, Axios interceptors, responsive Navbar, Role-based route guards).
+- **Week 6 (1F)**: MVP release tag, backend & frontend unit tests, integration verification.
 
-### Phase 2 (Enhancements & Documentation — Weeks 7 to 12)
-- **Week 7 (2A)**: Rescheduling and cancellation endpoints and UI, token preservation/reissuance, and concurrency tests.
-- **Week 8 (2B)**: NotificationService with SMTP and simulated fallback, SMS logging, and Notifications page.
+### Phase 2 (Enhancements & Production Polish — Weeks 7 to 12)
+- **Week 7-8 (2A)**: Appointment cancellation and slot rescheduling with token recalculation.
+- **Week 8 (2B)**: Automated email notification system with SMTP and safe simulated logging fallback.
 - **Week 9-10 (2C)**: Daily reports API, CSV export endpoint, and ReportsPage with Chart.js.
 - **Week 11-12 (2D)**: Consolidated end-to-end integration tests, final documentation accuracy pass, and release verification.
 
-### Phase 3 (Cloud Deployment — Render & PostgreSQL)
-- **3A**: Gunicorn + `psycopg2-binary`, `DATABASE_URL` normalization, `CORS_ORIGINS`, `postgres_schema.sql` & `postgres_seed.sql`.
-- **3B**: Frontend `VITE_API_URL` resolution, SPA routing rewrite (`/* -> /index.html`), and `render.yaml` Blueprint.
-- **3C**: Deployment documentation, full test & build verification, and PR merge to `main`.
-
 ---
 
-## 6. Comprehensive Documentation
+## 5. Comprehensive Documentation
 
 - [docs/DEVELOPER_MANUAL.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/DEVELOPER_MANUAL.md) — Step-by-step developer guide for manual end-to-end testing
 - [docs/SRS.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/SRS.md) — Software Requirements Specification
@@ -139,4 +98,4 @@ See [docs/DEPLOYMENT_NOTES.md](file:///d:/projects/Smart%20Hospital%20Appointmen
 - [docs/ARCHITECTURE.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/ARCHITECTURE.md) — System Architecture & REST API Reference Table
 - [docs/TEST_PLAN_AND_CASES.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/TEST_PLAN_AND_CASES.md) — Test Cases & Execution Matrix
 - [docs/USER_MANUAL.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/USER_MANUAL.md) — Step-by-step role guides
-- [docs/DEPLOYMENT_NOTES.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/DEPLOYMENT_NOTES.md) — Render PostgreSQL & self-hosted production setup
+- [docs/DEPLOYMENT_NOTES.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/DEPLOYMENT_NOTES.md) — Production setup & Nginx configuration
