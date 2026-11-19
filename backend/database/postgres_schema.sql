@@ -96,6 +96,9 @@ CREATE INDEX idx_doctor_schedules_doctor_day ON doctor_schedules (doctor_id, day
 -- 6. appointments
 -- Duplicate-slot constraint via STORED generated column active_slot_key:
 -- NULL when status = 'CANCELLED', else doctor_id || '|' || appointment_date || '|' || slot_time
+-- 6. appointments
+-- Duplicate-slot constraint via partial unique index uq_appointments_active_slot:
+-- Allows rebooking a doctor + date + slot_time only if prior bookings are CANCELLED.
 CREATE TABLE appointments (
     id SERIAL PRIMARY KEY,
     patient_id INTEGER NOT NULL,
@@ -114,8 +117,6 @@ CREATE TABLE appointments (
     created_by_user_id INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT uq_appointments_active_slot_key UNIQUE (active_slot_key),
     CONSTRAINT uq_appointments_doctor_date_token UNIQUE (doctor_id, appointment_date, token_number),
     CONSTRAINT fk_appointments_patient FOREIGN KEY (patient_id)
         REFERENCES patients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
