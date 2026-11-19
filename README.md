@@ -98,6 +98,7 @@ npm run dev                # http://127.0.0.1:5173
 
 ## 5. Comprehensive Documentation
 
+- [docs/DEVELOPER_MANUAL.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/DEVELOPER_MANUAL.md) — Step-by-step developer guide for manual end-to-end testing
 - [docs/SRS.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/SRS.md) — Software Requirements Specification
 - [docs/ER_AND_UML_DIAGRAMS.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/ER_AND_UML_DIAGRAMS.md) — Mermaid ER, Use-Case, Sequence, and State Diagrams
 - [docs/ARCHITECTURE.md](file:///d:/projects/Smart%20Hospital%20Appointment%20and%20Patient%20Queue%20Management%20System/docs/ARCHITECTURE.md) — System Architecture & REST API Reference Table
