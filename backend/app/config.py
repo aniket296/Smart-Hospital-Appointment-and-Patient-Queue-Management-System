@@ -7,6 +7,26 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def normalize_database_url(raw_url: str | None) -> str | None:
+    """Normalize Render/Heroku postgres:// or postgresql:// URLs for SQLAlchemy + psycopg2."""
+    if not raw_url:
+        return None
+    url = raw_url.strip()
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
+
+def parse_cors_origins(raw_origins: str | None) -> str | list[str]:
+    """Parse comma-separated CORS_ORIGINS env var or return '*' if wildcard/empty."""
+    if not raw_origins or not raw_origins.strip() or raw_origins.strip() == "*":
+        return "*"
+    origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    return origins if origins else "*"
+
+
 def build_mysql_uri(db_name_env: str, default_db_name: str) -> str:
     """Build a SQLAlchemy MySQL+PyMySQL connection URI from environment variables."""
     host = os.getenv("DB_HOST", "127.0.0.1")
@@ -32,10 +52,10 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-key-change-in-production")
     JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "8"))
     HOSPITAL_TIMEZONE = os.getenv("HOSPITAL_TIMEZONE", "Asia/Kolkata")
+    CORS_ORIGINS = parse_cors_origins(os.getenv("CORS_ORIGINS", "*"))
 
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        build_mysql_uri("DB_NAME", "hospital_queue_db"),
+    SQLALCHEMY_DATABASE_URI = normalize_database_url(os.getenv("DATABASE_URL")) or build_mysql_uri(
+        "DB_NAME", "hospital_queue_db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -63,10 +83,9 @@ class TestingConfig(Config):
     """Testing configuration using separate test database."""
 
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "TEST_DATABASE_URL",
-        build_mysql_uri("TEST_DB_NAME", "hospital_queue_test_db"),
-    )
+    SQLALCHEMY_DATABASE_URI = normalize_database_url(
+        os.getenv("TEST_DATABASE_URL")
+    ) or build_mysql_uri("TEST_DB_NAME", "hospital_queue_test_db")
 
 
 class ProductionConfig(Config):

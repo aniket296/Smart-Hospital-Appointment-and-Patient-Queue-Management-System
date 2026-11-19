@@ -1,0 +1,141 @@
+-- =============================================================================
+-- Project 25: Smart Hospital Appointment and Patient Queue Management System
+-- Seed Data for Render PostgreSQL (PostgreSQL 14+)
+-- Contains real Werkzeug scrypt password hashes and CURRENT_DATE-relative dates
+-- =============================================================================
+
+BEGIN;
+
+TRUNCATE TABLE
+    notification_logs,
+    appointment_status_history,
+    doctor_token_counters,
+    appointments,
+    doctor_schedules,
+    doctors,
+    departments,
+    patients,
+    users
+RESTART IDENTITY CASCADE;
+
+-- 1. Users
+-- Credentials:
+-- admin@hospital.test    / Admin@123
+-- doctor1@hospital.test  / Doctor@123
+-- doctor2@hospital.test  / Doctor@123
+-- doctor3@hospital.test  / Doctor@123
+-- patient1@hospital.test / Patient@123
+-- patient2@hospital.test / Patient@123
+-- patient3@hospital.test / Patient@123
+INSERT INTO users (id, name, email, password_hash, role, is_active, created_at) VALUES
+(1, 'Hospital Admin', 'admin@hospital.test', 'scrypt:32768:8:1$jwbcw8KoHIup0a7P$3fea121746ad2e04617f8d3b046da7d6d65bf836789fe410ce743832a90961c4c328086b774161bf724c2c1c65240e621ae6a03ef17de950bdbf2994e384d5d9', 'ADMIN', TRUE, CURRENT_TIMESTAMP),
+(2, 'Dr. Aarav Sharma', 'doctor1@hospital.test', 'scrypt:32768:8:1$udfnNqEBznPkhjMf$6432ca9597cc89c6763ae2e48db83d90beea7b298edcaeffa4c4a6aa0de5802b68da9b263d1d61036c88e8350ca737f793095e3cecf7d5bc9fe4490d262ef1ad', 'DOCTOR', TRUE, CURRENT_TIMESTAMP),
+(3, 'Dr. Priya Nair', 'doctor2@hospital.test', 'scrypt:32768:8:1$cfQH0aqRb8LoFXXW$a904b812f9703d921faf6683ec0383254ddc7aa34d8401557f46c5c83c77ef93135bc8a26edf5b206623b2972a4044748b503c746bbd4dc65b19140e20df08f9', 'DOCTOR', TRUE, CURRENT_TIMESTAMP),
+(4, 'Dr. Rohan Verma', 'doctor3@hospital.test', 'scrypt:32768:8:1$m6zxdMqwU1yYdbs0$28e94874edaf9d1d67e389822b029a6df5d89fb2f7e5d8b90b09fbabcb762e85a45a7e874802cd372c1c7406a0bd91511485b8600e4b6ec990bfb8d03ed2045b', 'DOCTOR', TRUE, CURRENT_TIMESTAMP),
+(5, 'Ananya Gupta', 'patient1@hospital.test', 'scrypt:32768:8:1$ohZDvSfrA4oFsMFv$118272008bee2ef4cd6f3cf306517e1e36fe6ec04ea0779f9efb6c298f28993b1c632cb7c21759c7c9c629fad4956bf0b43128dec15c348d08cdabd61843e030', 'PATIENT', TRUE, CURRENT_TIMESTAMP),
+(6, 'Vikram Singh', 'patient2@hospital.test', 'scrypt:32768:8:1$TkwgicTEK0WcJHK6$c40a9fd2426678d1dffd6bb0adcadb952a96c7cde13c9a30a40efaab4c8ef16a5849c2b5e5a41dce458449657eca55f48b14d2774eb558dfc928b488f2dcc661', 'PATIENT', TRUE, CURRENT_TIMESTAMP),
+(7, 'Meera Patel', 'patient3@hospital.test', 'scrypt:32768:8:1$P4PXIkNvuKesH9mj$cc9b2af5b01fa65322e097287ad517f14b805f5d24bb7f702066355e3f75ee200393390d25dc6f2095f84a8e7fe9280702ebb3ef5169793a8dd5e8e9c2a129fb', 'PATIENT', TRUE, CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT COALESCE(MAX(id), 1) FROM users));
+
+-- 2. Departments
+INSERT INTO departments (id, name, description) VALUES
+(1, 'Cardiology', 'Heart and cardiovascular care, ECG, and hypertension management'),
+(2, 'General Medicine', 'Primary care, internal medicine, and routine health consultations'),
+(3, 'Orthopedics', 'Bone, joint, spine, and musculoskeletal care')
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('departments', 'id'), (SELECT COALESCE(MAX(id), 1) FROM departments));
+
+-- 3. Doctors
+INSERT INTO doctors (id, user_id, department_id, doc_code, specialization, room_number, default_slot_duration_minutes, is_active) VALUES
+(1, 2, 1, 'DOC1', 'Senior Cardiologist', 'Room 101', 15, TRUE),
+(2, 3, 2, 'DOC2', 'Consultant Physician', 'Room 202', 20, TRUE),
+(3, 4, 3, 'DOC3', 'Orthopedic Specialist', 'Room 305', 15, TRUE)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('doctors', 'id'), (SELECT COALESCE(MAX(id), 1) FROM doctors));
+
+-- 4. Patients (3 registered users + 1 walk-in patient without user account)
+INSERT INTO patients (id, user_id, full_name, phone, email, date_of_birth, gender, created_at) VALUES
+(1, 5, 'Ananya Gupta', '9876543210', 'patient1@hospital.test', '1995-04-12', 'Female', CURRENT_TIMESTAMP),
+(2, 6, 'Vikram Singh', '9876543211', 'patient2@hospital.test', '1988-09-23', 'Male', CURRENT_TIMESTAMP),
+(3, 7, 'Meera Patel', '9876543212', 'patient3@hospital.test', '1992-12-05', 'Female', CURRENT_TIMESTAMP),
+(4, NULL, 'Ramesh Kumar (Walk-In)', '9876500001', 'ramesh.walkin@example.com', '1975-06-18', 'Male', CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('patients', 'id'), (SELECT COALESCE(MAX(id), 1) FROM patients));
+
+-- 5. Doctor Schedules (All 7 days 0..6 so testing and demos work on any day of the week)
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, slot_duration_minutes, max_patients, is_active) VALUES
+(1, 0, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 1, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 2, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 3, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 4, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 5, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 6, '09:00:00', '13:00:00', 15, 12, TRUE),
+(1, 0, '14:00:00', '20:00:00', 15, 16, TRUE),
+(1, 1, '14:00:00', '20:00:00', 15, 16, TRUE),
+(1, 2, '14:00:00', '20:00:00', 15, 16, TRUE),
+(1, 3, '14:00:00', '20:00:00', 15, 16, TRUE),
+(1, 4, '14:00:00', '20:00:00', 15, 16, TRUE),
+(1, 5, '14:00:00', '20:00:00', 15, 16, TRUE),
+(1, 6, '14:00:00', '20:00:00', 15, 16, TRUE),
+(2, 0, '09:00:00', '17:00:00', 20, 20, TRUE),
+(2, 1, '09:00:00', '17:00:00', 20, 20, TRUE),
+(2, 2, '09:00:00', '17:00:00', 20, 20, TRUE),
+(2, 3, '09:00:00', '17:00:00', 20, 20, TRUE),
+(2, 4, '09:00:00', '17:00:00', 20, 20, TRUE),
+(2, 5, '09:00:00', '17:00:00', 20, 20, TRUE),
+(2, 6, '09:00:00', '17:00:00', 20, 20, TRUE),
+(3, 0, '10:00:00', '16:00:00', 15, 18, TRUE),
+(3, 1, '10:00:00', '16:00:00', 15, 18, TRUE),
+(3, 2, '10:00:00', '16:00:00', 15, 18, TRUE),
+(3, 3, '10:00:00', '16:00:00', 15, 18, TRUE),
+(3, 4, '10:00:00', '16:00:00', 15, 18, TRUE),
+(3, 5, '10:00:00', '16:00:00', 15, 18, TRUE),
+(3, 6, '10:00:00', '16:00:00', 15, 18, TRUE)
+ON CONFLICT (doctor_id, day_of_week, start_time) DO NOTHING;
+
+-- 6. Sample Appointments (using CURRENT_DATE and CURRENT_DATE + INTERVAL '1 day')
+INSERT INTO appointments (id, patient_id, doctor_id, appointment_date, slot_time, booking_type, status, token_number, previous_token, reason, created_by_user_id, created_at, updated_at) VALUES
+(1, 1, 1, CURRENT_DATE, '09:00:00', 'ONLINE', 'COMPLETED', 'DOC1-001', NULL, 'Routine blood pressure checkup', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 2, 1, CURRENT_DATE, '09:15:00', 'ONLINE', 'IN_CONSULTATION', 'DOC1-002', NULL, 'Chest discomfort on exertion', 6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 4, 1, CURRENT_DATE, '09:30:00', 'WALK_IN', 'CONFIRMED', 'DOC1-003', NULL, 'Walk-in ECG review', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 3, 2, CURRENT_DATE, '10:00:00', 'ONLINE', 'BOOKED', 'DOC2-001', NULL, 'Seasonal fever and fatigue', 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 1, 3, (CURRENT_DATE + INTERVAL '1 day')::date, '11:00:00', 'ONLINE', 'BOOKED', 'DOC3-001', NULL, 'Knee joint pain consultation', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('appointments', 'id'), (SELECT COALESCE(MAX(id), 1) FROM appointments));
+
+-- 7. Doctor Token Counters
+INSERT INTO doctor_token_counters (doctor_id, token_date, last_seq) VALUES
+(1, CURRENT_DATE, 3),
+(2, CURRENT_DATE, 1),
+(3, (CURRENT_DATE + INTERVAL '1 day')::date, 1)
+ON CONFLICT (doctor_id, token_date) DO UPDATE SET last_seq = EXCLUDED.last_seq;
+
+-- 8. Appointment Status History
+INSERT INTO appointment_status_history (appointment_id, old_status, new_status, changed_by_user_id, changed_at, note) VALUES
+(1, NULL, 'BOOKED', 5, CURRENT_TIMESTAMP, 'Initial online booking'),
+(1, 'BOOKED', 'CONFIRMED', 1, CURRENT_TIMESTAMP, 'Confirmed by reception'),
+(1, 'CONFIRMED', 'IN_CONSULTATION', 2, CURRENT_TIMESTAMP, 'Consultation started'),
+(1, 'IN_CONSULTATION', 'COMPLETED', 2, CURRENT_TIMESTAMP, 'Consultation completed'),
+(2, NULL, 'BOOKED', 6, CURRENT_TIMESTAMP, 'Initial online booking'),
+(2, 'BOOKED', 'CONFIRMED', 1, CURRENT_TIMESTAMP, 'Confirmed by reception'),
+(2, 'CONFIRMED', 'IN_CONSULTATION', 2, CURRENT_TIMESTAMP, 'Doctor called token DOC1-002'),
+(3, NULL, 'CONFIRMED', 1, CURRENT_TIMESTAMP, 'Walk-in registered and confirmed'),
+(4, NULL, 'BOOKED', 7, CURRENT_TIMESTAMP, 'Initial online booking'),
+(5, NULL, 'BOOKED', 5, CURRENT_TIMESTAMP, 'Initial online booking for tomorrow');
+
+-- 9. Sample Notification Logs
+INSERT INTO notification_logs (user_id, patient_id, appointment_id, channel, event_type, recipient, subject, message, delivery_mode, status, error_message, created_at) VALUES
+(5, 1, 1, 'EMAIL', 'BOOKING_CREATED', 'patient1@hospital.test', 'Appointment Booked - Token DOC1-001', 'Your appointment with Dr. Aarav Sharma has been booked. Token: DOC1-001.', 'SIMULATED', 'SENT', 'SMTP not configured; simulated delivery', CURRENT_TIMESTAMP),
+(5, 1, 1, 'SMS', 'BOOKING_CREATED', '9876543210', 'SMS Alert: Token DOC1-001', 'Smart Hospital: Appointment booked with Dr. Aarav Sharma. Token DOC1-001.', 'SIMULATED', 'SENT', NULL, CURRENT_TIMESTAMP),
+(6, 2, 2, 'EMAIL', 'STATUS_UPDATED', 'patient2@hospital.test', 'Token DOC1-002 Now In Consultation', 'Dr. Aarav Sharma is now seeing token DOC1-002 in Room 101.', 'SIMULATED', 'SENT', 'SMTP not configured; simulated delivery', CURRENT_TIMESTAMP),
+(6, 2, 2, 'SMS', 'STATUS_UPDATED', '9876543211', 'SMS Alert: In Consultation', 'Smart Hospital: Token DOC1-002 is now IN_CONSULTATION (Room 101).', 'SIMULATED', 'SENT', NULL, CURRENT_TIMESTAMP),
+(NULL, 4, 3, 'SMS', 'WALKIN_CONFIRMED', '9876500001', 'SMS Alert: Walk-In Token DOC1-003', 'Smart Hospital: Walk-in registered with Dr. Aarav Sharma. Token DOC1-003.', 'SIMULATED', 'SENT', NULL, CURRENT_TIMESTAMP);
+
+COMMIT;
