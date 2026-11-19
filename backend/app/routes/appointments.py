@@ -2,10 +2,12 @@
 
 from flask import Blueprint, g, jsonify, request
 from backend.app.services.booking_service import (
+    cancel_appointment,
     create_online_booking,
     create_walkin_booking,
     get_daily_queue,
     list_appointments,
+    reschedule_appointment,
     transition_appointment_status,
 )
 from backend.app.utils.auth import auth_required, roles_required
@@ -71,6 +73,46 @@ def patch_appointment_status(appointment_id: int):
         appointment_id=appointment_id,
         new_status=new_status,
         note=note,
+    )
+    return jsonify({"appointment": appt}), 200
+
+
+@appointments_bp.route("/appointments/<int:appointment_id>/reschedule", methods=["PATCH"])
+@auth_required
+def patch_reschedule(appointment_id: int):
+    """Reschedule a BOOKED or CONFIRMED appointment."""
+    data = request.get_json(silent=True) or {}
+    new_doctor_id = data.get("doctor_id")
+    new_date = data.get("appointment_date")
+    new_slot = data.get("slot_time")
+
+    if not new_doctor_id or not new_date or not new_slot:
+        raise APIError(
+            "VALIDATION_ERROR",
+            "doctor_id, appointment_date, and slot_time are required to reschedule.",
+            400,
+        )
+
+    appt = reschedule_appointment(
+        current_user=g.current_user,
+        appointment_id=appointment_id,
+        new_doctor_id=int(new_doctor_id),
+        new_date_str=str(new_date),
+        new_slot_str=str(new_slot),
+    )
+    return jsonify({"appointment": appt}), 200
+
+
+@appointments_bp.route("/appointments/<int:appointment_id>/cancel", methods=["POST"])
+@auth_required
+def post_cancel(appointment_id: int):
+    """Cancel a BOOKED or CONFIRMED appointment."""
+    data = request.get_json(silent=True) or {}
+    reason = data.get("reason")
+    appt = cancel_appointment(
+        current_user=g.current_user,
+        appointment_id=appointment_id,
+        reason=reason,
     )
     return jsonify({"appointment": appt}), 200
 

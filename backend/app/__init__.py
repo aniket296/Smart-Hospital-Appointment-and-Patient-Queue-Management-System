@@ -8,6 +8,8 @@ from backend.app.routes.appointments import appointments_bp
 from backend.app.routes.auth import auth_bp
 from backend.app.routes.health import health_bp
 from backend.app.routes.master import master_bp
+from backend.app.routes.notifications import notifications_bp
+from backend.app.routes.reports import reports_bp
 from backend.app.utils.errors import register_error_handlers
 
 
@@ -35,5 +37,7 @@ def create_app(config_name: str | None = None, config_overrides: dict | None = N
     app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(master_bp, url_prefix="/api")
     app.register_blueprint(appointments_bp, url_prefix="/api")
+    app.register_blueprint(notifications_bp, url_prefix="/api")
+    app.register_blueprint(reports_bp, url_prefix="/api")
 
     return app

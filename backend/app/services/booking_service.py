@@ -20,6 +20,7 @@ from backend.app.services.master_service import (
     parse_time_str,
 )
 from backend.app.utils.errors import APIError
+from backend.app.services.notification_service import NotificationService
 from backend.app.utils.timezone import current_time_hospital, now_hospital_naive, today_hospital
 
 TERMINAL_STATUSES = {"COMPLETED", "CANCELLED", "NO_SHOW"}
@@ -238,6 +239,14 @@ def create_online_booking(current_user: User, data: dict) -> dict:
         )
         db.session.add(history)
         db.session.commit()
+
+        # Trigger notification
+        NotificationService.send_notification(
+            event_type="BOOKING_CREATED",
+            subject=f"Appointment Booked: Token {appointment.token_number}",
+            message=f"Your appointment with Dr. {doctor.doc_code} on {target_date.isoformat()} at {slot_time.strftime('%H:%M')} is booked. Token: {appointment.token_number}.",
+            appointment=appointment,
+        )
     except IntegrityError as exc:
         db.session.rollback()
         raise APIError(
@@ -368,6 +377,14 @@ def create_walkin_booking(current_user: User, data: dict) -> dict:
         )
         db.session.add(history)
         db.session.commit()
+
+        # Trigger notification
+        NotificationService.send_notification(
+            event_type="BOOKING_CREATED",
+            subject=f"Appointment Booked: Token {appointment.token_number}",
+            message=f"Your appointment with Dr. {doctor.doc_code} on {target_date.isoformat()} at {slot_time.strftime('%H:%M')} is booked. Token: {appointment.token_number}.",
+            appointment=appointment,
+        )
     except IntegrityError as exc:
         db.session.rollback()
         raise APIError(
@@ -534,7 +551,133 @@ def transition_appointment_status(
     db.session.add(history)
     db.session.commit()
 
+    NotificationService.send_notification(
+        event_type="STATUS_UPDATED",
+        subject=f"Appointment Status: {target_status} (Token {appointment.token_number})",
+        message=f"Appointment {appointment.token_number} status changed from {old_status} to {target_status}.",
+        appointment=appointment,
+    )
+
     return appointment.to_dict(include_history=True)
+
+
+def reschedule_appointment(
+    current_user: User,
+    appointment_id: int,
+    new_doctor_id: int,
+    new_date_str: str,
+    new_slot_str: str,
+) -> dict:
+    """
+    Reschedule a BOOKED or CONFIRMED appointment (Patient own or Admin).
+    If doctor and date are unchanged, the token is kept.
+    If the date or doctor changes, a new token is issued for the new day
+    and the old one is saved in previous_token.
+    """
+    appointment = db.session.get(Appointment, appointment_id)
+    if not appointment:
+        raise APIError("NOT_FOUND", f"Appointment with id {appointment_id} not found.", 404)
+
+    if appointment.status not in ("BOOKED", "CONFIRMED"):
+        raise APIError(
+            "INVALID_RESCHEDULE",
+            f"Only BOOKED or CONFIRMED appointments can be rescheduled. Current status: '{appointment.status}'.",
+            400,
+        )
+
+    # Permission check: Patient (own) or Admin
+    if current_user.role == "PATIENT":
+        if not current_user.patient_profile or current_user.patient_profile.id != appointment.patient_id:
+            raise APIError("FORBIDDEN", "Patients can only reschedule their own appointments.", 403)
+    elif current_user.role != "ADMIN":
+        raise APIError("FORBIDDEN", "Only the Patient or an Admin can reschedule appointments.", 403)
+
+    target_doctor = get_doctor_or_404(new_doctor_id)
+    target_date = parse_date_str(new_date_str, "new_date")
+    target_slot = parse_time_str(new_slot_str, "new_slot")
+
+    # Validate slot, schedule and capacity excluding the current appointment
+    validate_slot_and_capacity(
+        target_doctor,
+        target_date,
+        target_slot,
+        exclude_appointment_id=appointment.id,
+    )
+
+    old_doc_id = appointment.doctor_id
+    old_date = appointment.appointment_date
+    old_token = appointment.token_number
+
+    # Token logic (Section 5.8):
+    # If doctor and date are unchanged, the token is kept.
+    # If the date or doctor changes, a new token is issued for the new day and old is in previous_token.
+    if old_doc_id == target_doctor.id and old_date == target_date:
+        # Same doctor and date, keep token
+        pass
+    else:
+        new_token = _next_token_number(target_doctor, target_date)
+        appointment.previous_token = old_token
+        appointment.token_number = new_token
+
+    appointment.doctor_id = target_doctor.id
+    appointment.appointment_date = target_date
+    appointment.slot_time = target_slot
+    appointment.updated_at = now_hospital_naive()
+
+    history = AppointmentStatusHistory(
+        appointment_id=appointment.id,
+        old_status=appointment.status,
+        new_status=appointment.status,
+        changed_by_user_id=current_user.id,
+        changed_at=now_hospital_naive(),
+        note=f"Rescheduled to Dr. {target_doctor.doc_code} on {target_date.isoformat()} at {target_slot.strftime('%H:%M')}",
+    )
+    db.session.add(history)
+    db.session.commit()
+
+    NotificationService.send_notification(
+        event_type="APPOINTMENT_RESCHEDULED",
+        subject=f"Appointment Rescheduled: Token {appointment.token_number}",
+        message=f"Your appointment was rescheduled to Dr. {target_doctor.doc_code} on {target_date.isoformat()} at {target_slot.strftime('%H:%M')}. Current Token: {appointment.token_number}.",
+        appointment=appointment,
+    )
+
+    return appointment.to_dict(include_history=True)
+
+
+def cancel_appointment(
+    current_user: User,
+    appointment_id: int,
+    reason: str | None = None,
+) -> dict:
+    """
+    Cancel a BOOKED or CONFIRMED appointment (Patient own or Admin).
+    Setting CANCELLED frees the slot (active_slot_key becomes NULL).
+    """
+    appointment = db.session.get(Appointment, appointment_id)
+    if not appointment:
+        raise APIError("NOT_FOUND", f"Appointment with id {appointment_id} not found.", 404)
+
+    if appointment.status not in ("BOOKED", "CONFIRMED"):
+        raise APIError(
+            "INVALID_CANCELLATION",
+            f"Only BOOKED or CONFIRMED appointments can be cancelled. Current status: '{appointment.status}'.",
+            400,
+        )
+
+    # Permission check: Patient (own) or Admin
+    if current_user.role == "PATIENT":
+        if not current_user.patient_profile or current_user.patient_profile.id != appointment.patient_id:
+            raise APIError("FORBIDDEN", "Patients can only cancel their own appointments.", 403)
+    elif current_user.role != "ADMIN":
+        raise APIError("FORBIDDEN", "Only the Patient or an Admin can cancel appointments.", 403)
+
+    return transition_appointment_status(
+        current_user=current_user,
+        appointment_id=appointment_id,
+        new_status="CANCELLED",
+        note=reason or "Appointment cancelled by user request",
+    )
 
 
 def get_daily_queue(

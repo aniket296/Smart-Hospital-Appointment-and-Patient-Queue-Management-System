@@ -3,9 +3,14 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { getDefaultRouteForRole, useAuth } from './context/AuthContext';
+import AdminDashboard from './pages/AdminDashboard';
+import DoctorDashboard from './pages/DoctorDashboard';
 import LoginPage from './pages/LoginPage';
+import NotificationsPage from './pages/NotificationsPage';
 import PatientDashboard from './pages/PatientDashboard';
+import QueueBoard from './pages/QueueBoard';
 import RegisterPage from './pages/RegisterPage';
+import ReportsPage from './pages/ReportsPage';
 
 function RoleHomeRedirect() {
   const { user } = useAuth();
@@ -34,9 +39,7 @@ export default function App() {
             path="/doctor"
             element={
               <ProtectedRoute allowedRoles={['DOCTOR']}>
-                <div className="page-container">
-                  <h1>Doctor Dashboard</h1>
-                </div>
+                <DoctorDashboard />
               </ProtectedRoute>
             }
           />
@@ -44,18 +47,25 @@ export default function App() {
             path="/admin"
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
-                <div className="page-container">
-                  <h1>Admin Dashboard</h1>
-                </div>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/queue" element={<QueueBoard />} />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/queue"
+            path="/reports"
             element={
-              <div className="page-container">
-                <h1>Live Queue Board</h1>
-              </div>
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <ReportsPage />
+              </ProtectedRoute>
             }
           />
           <Route path="*" element={<RoleHomeRedirect />} />
