@@ -61,9 +61,15 @@ flowchart LR
 │   ├── requirements.txt
 │   └── run.py
 ├── frontend/
+│   ├── index.html
 │   ├── package.json
 │   ├── vite.config.js
-│   └── src/                     # React components, pages, context, API client, tests
+│   └── src/
+│       ├── api/client.js        # Axios client with Bearer token & 401 handling
+│       ├── components/          # Navbar, ProtectedRoute (role guards)
+│       ├── context/AuthContext.jsx
+│       ├── pages/               # LoginPage, RegisterPage, PatientDashboard, staff & queue pages
+│       └── test/                # Vitest + React Testing Library setup and suites
 └── docs/
     ├── SRS.md
     ├── ER_AND_UML_DIAGRAMS.md
