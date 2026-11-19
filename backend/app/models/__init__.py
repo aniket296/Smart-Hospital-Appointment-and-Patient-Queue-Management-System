@@ -1,8 +1,8 @@
 """SQLAlchemy ORM models matching backend/database/schema.sql."""
 
-from datetime import datetime
 from sqlalchemy import Computed, UniqueConstraint
 from backend.app.extensions import db
+from backend.app.utils.timezone import now_hospital_naive
 
 
 class User(db.Model):
@@ -18,7 +18,7 @@ class User(db.Model):
         default="PATIENT",
     )
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_hospital_naive)
 
     patient_profile = db.relationship("Patient", back_populates="user", uselist=False)
     doctor_profile = db.relationship("Doctor", back_populates="user", uselist=False)
@@ -55,7 +55,7 @@ class Patient(db.Model):
     email = db.Column(db.String(190), nullable=True)
     date_of_birth = db.Column(db.Date, nullable=True)
     gender = db.Column(db.String(20), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_hospital_naive)
 
     user = db.relationship("User", back_populates="patient_profile")
     appointments = db.relationship("Appointment", back_populates="patient")
@@ -220,12 +220,12 @@ class Appointment(db.Model):
         db.ForeignKey("users.id", ondelete="RESTRICT", onupdate="CASCADE"),
         nullable=False,
     )
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_hospital_naive)
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=now_hospital_naive,
+        onupdate=now_hospital_naive,
     )
     active_slot_key = db.Column(
         db.String(64),
@@ -305,7 +305,7 @@ class AppointmentStatusHistory(db.Model):
         db.ForeignKey("users.id", ondelete="RESTRICT", onupdate="CASCADE"),
         nullable=False,
     )
-    changed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    changed_at = db.Column(db.DateTime, nullable=False, default=now_hospital_naive)
     note = db.Column(db.String(255), nullable=True)
 
     appointment = db.relationship("Appointment", back_populates="status_history")
@@ -355,7 +355,7 @@ class NotificationLog(db.Model):
     )
     status = db.Column(db.String(30), nullable=False, default="SENT")
     error_message = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_hospital_naive)
 
     def to_dict(self):
         return {

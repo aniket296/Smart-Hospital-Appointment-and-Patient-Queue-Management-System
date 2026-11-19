@@ -82,7 +82,8 @@ flowchart LR
 | `GET` | `/api/auth/me` | Authenticated | Return current user details and linked patient/doctor profile IDs |
 | `GET` | `/api/departments` | Public / Auth | List all hospital departments |
 | `POST` | `/api/departments` | `ADMIN` | Create a new department |
-| `GET` | `/api/doctors` | Public / Auth | List doctors (optional `department_id` or `active_only` filter) |
+| `GET` | `/api/doctors` | Public / Auth | List doctors (optional `department_id`, `active_only`, `include_schedules` filters) |
+| `GET` | `/api/doctors/<id>` | Public / Auth | Retrieve single doctor profile including schedules |
 | `POST` | `/api/doctors` | `ADMIN` | Create a doctor user account + doctor profile (`doc_code`, room, etc.) |
 | `GET` | `/api/doctors/<id>/schedules` | Public / Auth | List schedules for a specific doctor |
 | `POST` | `/api/doctors/<id>/schedules` | `ADMIN` | Add a weekday schedule for a doctor (validates no overlap) |
