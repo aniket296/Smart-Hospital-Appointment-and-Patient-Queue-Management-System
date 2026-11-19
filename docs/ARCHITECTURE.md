@@ -88,11 +88,11 @@ flowchart LR
 | `GET` | `/api/doctors/<id>/schedules` | Public / Auth | List schedules for a specific doctor |
 | `POST` | `/api/doctors/<id>/schedules` | `ADMIN` | Add a weekday schedule for a doctor (validates no overlap) |
 | `GET` | `/api/doctors/<id>/slots` | Public / Auth | Compute open/booked slots and remaining capacity for `?date=YYYY-MM-DD` |
-| `GET` | `/api/patients` | `ADMIN` | List/search patients for walk-in booking |
-| `POST` | `/api/appointments` | `PATIENT`, `ADMIN` | Online appointment booking (`BOOKED`) |
-| `POST` | `/api/appointments/walk-in` | `ADMIN` | Walk-in registration & booking (`CONFIRMED`, auto-slot if omitted) |
-| `GET` | `/api/appointments` | `PATIENT`, `DOCTOR`, `ADMIN` | List appointments (role-scoped; filterable by date, doctor, status) |
-| `PATCH` | `/api/appointments/<id>/status` | `PATIENT`, `DOCTOR`, `ADMIN` | Transition appointment status via state machine and write history |
+| `GET` | `/api/patients` | `ADMIN` | List/search patients for walk-in booking (`?search=`) |
+| `POST` | `/api/appointments` | `PATIENT`, `ADMIN` | Online appointment booking (`BOOKED`, issues `<DOC_CODE>-<3-digit-seq>`) |
+| `POST` | `/api/appointments/walk-in` | `ADMIN` | Walk-in registration & booking (`CONFIRMED`, auto-assigns next free slot if `slot_time` omitted) |
+| `GET` | `/api/appointments` | `PATIENT`, `DOCTOR`, `ADMIN` | List appointments (role-scoped; filterable by `date`, `doctor_id`, `status`, `include_history`) |
+| `PATCH` | `/api/appointments/<id>/status` | `PATIENT`, `DOCTOR`, `ADMIN` | Transition appointment status via state machine and write `appointment_status_history` |
 | `PATCH` | `/api/appointments/<id>/reschedule` | `PATIENT`, `ADMIN` | Reschedule a `BOOKED` or `CONFIRMED` appointment |
 | `POST` | `/api/appointments/<id>/cancel` | `PATIENT`, `ADMIN` | Cancel a `BOOKED` or `CONFIRMED` appointment and free the slot |
 | `GET` | `/api/queue` | Public / Auth | Ordered daily queue (`?date=&doctor_id=&department_id=`) |

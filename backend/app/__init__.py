@@ -4,6 +4,7 @@ import os
 from flask import Flask
 from backend.app.config import CONFIG_BY_NAME, Config
 from backend.app.extensions import cors, db
+from backend.app.routes.appointments import appointments_bp
 from backend.app.routes.auth import auth_bp
 from backend.app.routes.health import health_bp
 from backend.app.routes.master import master_bp
@@ -33,5 +34,6 @@ def create_app(config_name: str | None = None, config_overrides: dict | None = N
     app.register_blueprint(health_bp, url_prefix="/api")
     app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(master_bp, url_prefix="/api")
+    app.register_blueprint(appointments_bp, url_prefix="/api")
 
     return app
