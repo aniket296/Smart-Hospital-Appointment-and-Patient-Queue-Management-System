@@ -1,15 +1,6 @@
 import axios from 'axios';
 
-export function resolveApiBaseUrl(env = import.meta.env) {
-  const raw = env?.VITE_API_URL || env?.VITE_API_BASE_URL || '';
-  if (!raw || !raw.trim()) {
-    return '/api';
-  }
-  const trimmed = raw.trim().replace(/\/+$/, '');
-  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
